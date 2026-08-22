@@ -1,8 +1,6 @@
-﻿import json
-
-# Load the timestamped transcript produced by transcribe.py.
-with open("transcript.json", "r", encoding="utf-8") as f:
-    transcript = json.load(f)
+﻿import argparse
+import json
+import os
 
 # Keep clips within the target duration range for short-form video.
 MIN_CLIP_LEN = 30
@@ -14,18 +12,24 @@ HOOK_KEYWORDS = [
     "nobody", "everyone", "stop", "important", "warning"
 ]
 
-def score_window(segments):
+def parse_args() -> argparse.Namespace:
+    """Parse the transcript filename supplied on the command line."""
+    parser = argparse.ArgumentParser(description="Select clip-worthy transcript segments.")
+    parser.add_argument(
+        "transcript_filename",
+        nargs="?",
+        default="transcript.json",
+        help="Transcript JSON filename or path (default: transcript.json)",
+    )
+    return parser.parse_args()
+
+
+def score_window(segments: list[dict]) -> float:
     """Assign a higher score to windows that are likely to retain attention."""
     text = " ".join(s["text"] for s in segments).lower()
     duration = segments[-1]["end"] - segments[0]["start"]
 
-    score = 0
-
-    # Reward ideal clip length (peak around 45-60s)
-    if MIN_CLIP_LEN <= duration <= MAX_CLIP_LEN:
-        score += 10
-    else:
-        score -= 5
+    score = 0.0
 
     # Reward hook keywords
     for kw in HOOK_KEYWORDS:
@@ -38,9 +42,19 @@ def score_window(segments):
     # Reward numbers/stats (specific claims are engaging)
     score += sum(1 for word in text.split() if any(c.isdigit() for c in word)) * 1.5
 
-    return score
+    # Normalize content density so longer windows do not win merely by accumulating hits.
+    score_per_second = score / duration if duration > 0 else 0.0
 
-def find_candidate_windows(transcript):
+    # Keep length and sentence-boundary preferences deliberately smaller than content density.
+    if MIN_CLIP_LEN <= duration <= MAX_CLIP_LEN:
+        score_per_second += 0.1
+    if segments[-1]["text"].rstrip().endswith((".", "!", "?")):
+        score_per_second += 0.15
+
+    return score_per_second
+
+
+def find_candidate_windows(transcript: list[dict]) -> list[list[dict]]:
     """Build every valid contiguous transcript window up to MAX_CLIP_LEN."""
     candidates = []
     n = len(transcript)
@@ -63,7 +77,9 @@ def find_candidate_windows(transcript):
 
     return candidates
 
-def pick_top_non_overlapping(scored_windows, top_n=5):
+def pick_top_non_overlapping(
+    scored_windows: list[tuple[float, list[dict]]], top_n: int = 5
+) -> list[tuple[float, list[dict]]]:
     """Select the highest-scoring windows while avoiding duplicate footage."""
     scored_windows.sort(key=lambda x: x[0], reverse=True)
     chosen = []
@@ -82,25 +98,37 @@ def pick_top_non_overlapping(scored_windows, top_n=5):
 
     return chosen
 
-candidates = find_candidate_windows(transcript)
-scored = [(score_window(w), w) for w in candidates]
-# Ranking happens before overlap filtering so the best available moments win.
-top_clips = pick_top_non_overlapping(scored, top_n=5)
+def main() -> None:
+    """Load a transcript, select clips, and save the ranked candidates as JSON."""
+    args = parse_args()
+    transcript_path = os.path.abspath(args.transcript_filename)
+    with open(transcript_path, "r", encoding="utf-8") as file:
+        transcript = json.load(file)
 
-print(f"Found {len(top_clips)} recommended clips:\n")
+    candidates = find_candidate_windows(transcript)
+    scored = [(score_window(window), window) for window in candidates]
+    # Ranking happens before overlap filtering so the best available moments win.
+    top_clips = pick_top_non_overlapping(scored, top_n=5)
 
-results = []
-for rank, (score, window) in enumerate(top_clips, 1):
-    # Use the first and last transcript timestamps as the clip boundaries.
-    start = window[0]["start"]
-    end = window[-1]["end"]
-    text = " ".join(s["text"] for s in window)
-    print(f"#{rank} | Score: {score:.1f} | {start:.1f}s -> {end:.1f}s ({end-start:.1f}s)")
-    print(f"   \"{text[:120]}...\"\n")
-    results.append({"rank": rank, "score": score, "start": start, "end": end, "text": text})
+    print(f"Found {len(top_clips)} recommended clips:\n")
 
-with open("clip_candidates.json", "w", encoding="utf-8") as f:
-    # Keep the JSON output easy to inspect and reuse in the next pipeline stage.
-    json.dump(results, f, indent=2, ensure_ascii=False)
+    results = []
+    for rank, (score, window) in enumerate(top_clips, 1):
+        # Use the first and last transcript timestamps as the clip boundaries.
+        start = window[0]["start"]
+        end = window[-1]["end"]
+        text = " ".join(s["text"] for s in window)
+        print(f"#{rank} | Score: {score:.3f} | {start:.1f}s -> {end:.1f}s ({end-start:.1f}s)")
+        print(f"   \"{text[:120]}...\"\n")
+        results.append({"rank": rank, "score": score, "start": start, "end": end, "text": text})
 
-print("Saved to clip_candidates.json")
+    output_path = os.path.abspath("clip_candidates.json")
+    print(f"Writing clip candidates to: {output_path}")
+    with open(output_path, "w", encoding="utf-8") as file:
+        json.dump(results, file, indent=2, ensure_ascii=False)
+
+    print(f"Saved to {output_path}")
+
+
+if __name__ == "__main__":
+    main()
