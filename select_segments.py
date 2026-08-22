@@ -1,8 +1,10 @@
 ﻿import json
 
+# Load the timestamped transcript produced by transcribe.py.
 with open("transcript.json", "r", encoding="utf-8") as f:
     transcript = json.load(f)
 
+# Keep clips within the target duration range for short-form video.
 MIN_CLIP_LEN = 30
 MAX_CLIP_LEN = 90
 
@@ -13,6 +15,7 @@ HOOK_KEYWORDS = [
 ]
 
 def score_window(segments):
+    """Assign a higher score to windows that are likely to retain attention."""
     text = " ".join(s["text"] for s in segments).lower()
     duration = segments[-1]["end"] - segments[0]["start"]
 
@@ -38,6 +41,7 @@ def score_window(segments):
     return score
 
 def find_candidate_windows(transcript):
+    """Build every valid contiguous transcript window up to MAX_CLIP_LEN."""
     candidates = []
     n = len(transcript)
 
@@ -48,26 +52,31 @@ def find_candidate_windows(transcript):
             duration = transcript[j]["end"] - transcript[i]["start"]
             if duration > MAX_CLIP_LEN:
                 break
+            # Add complete transcript segments so clips do not end mid-sentence.
             window.append(transcript[j])
             j += 1
 
         duration = window[-1]["end"] - window[0]["start"]
         if duration >= MIN_CLIP_LEN:
+            # Discard windows that are too short to be useful clips.
             candidates.append(window)
 
     return candidates
 
 def pick_top_non_overlapping(scored_windows, top_n=5):
+    """Select the highest-scoring windows while avoiding duplicate footage."""
     scored_windows.sort(key=lambda x: x[0], reverse=True)
     chosen = []
     used_ranges = []
 
     for score, window in scored_windows:
         start, end = window[0]["start"], window[-1]["end"]
+        # A candidate is usable only when it is separate from every chosen range.
         overlaps = any(not (end <= u_start or start >= u_end) for u_start, u_end in used_ranges)
         if not overlaps:
             chosen.append((score, window))
             used_ranges.append((start, end))
+        # Stop once the requested number of recommendations has been collected.
         if len(chosen) >= top_n:
             break
 
@@ -75,12 +84,14 @@ def pick_top_non_overlapping(scored_windows, top_n=5):
 
 candidates = find_candidate_windows(transcript)
 scored = [(score_window(w), w) for w in candidates]
+# Ranking happens before overlap filtering so the best available moments win.
 top_clips = pick_top_non_overlapping(scored, top_n=5)
 
 print(f"Found {len(top_clips)} recommended clips:\n")
 
 results = []
 for rank, (score, window) in enumerate(top_clips, 1):
+    # Use the first and last transcript timestamps as the clip boundaries.
     start = window[0]["start"]
     end = window[-1]["end"]
     text = " ".join(s["text"] for s in window)
@@ -89,6 +100,7 @@ for rank, (score, window) in enumerate(top_clips, 1):
     results.append({"rank": rank, "score": score, "start": start, "end": end, "text": text})
 
 with open("clip_candidates.json", "w", encoding="utf-8") as f:
+    # Keep the JSON output easy to inspect and reuse in the next pipeline stage.
     json.dump(results, f, indent=2, ensure_ascii=False)
 
 print("Saved to clip_candidates.json")
