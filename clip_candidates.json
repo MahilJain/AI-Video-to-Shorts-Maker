@@ -1,0 +1,23 @@
+[
+  {
+    "rank": 1,
+    "score": 60.0,
+    "start": 30.0,
+    "end": 119.4,
+    "text": "2 Append Nums of 5 next element we will append ARR2 what does this means? suppose for this example 5,4,3,8 we will create a list and the original element will append in list 1 and the other element will append in list 2 and after this 0 and index element we will have to simulate and simulate we will check list 1's last element list 1's last element is 5, list 2's so the last element is 4 so obviously list 1 is containing a greater element that is 5 and 5 is greater than 4 so next element is 3 so this will be appended in the list 1 we will check list 1's last element is 3, list 2's last element is 4 so 4 is greater than 3 so this time list 2 is containing a greater element compared to list 1's last element so list 2's last element is a more advanced element so the next element is 8 we will append in this 4 about list 2 and when all the elements k"
+  },
+  {
+    "rank": 2,
+    "score": 55.0,
+    "start": 147.14,
+    "end": 236.52,
+    "text": "k we will traverse this array from index 201 from index 2 and check its list 1 or list 2 which one's last element is greater and accordingly we will append the list 1 or list 2 so for index i for int i equals 2 i less than nums dot length i plus plus and if if list 1 list 1 dot get list 1 dot size minus 1 if this is greater than list 2 dot get list 2 dot size minus 1 so we can calculate the time here but we can write here so if list 1 dot get list 1 dot size minus 1 and greater than list 2 dot get list 2 dot size minus 1 here so if the list 1 is greater than list 1 then we will append the list 1 to list 1 dot add this nums of i nums of i as we will add the list 2 and this list 2 is containing greater element last element of list 2 is greater than last element of list 1 so this list 2 list 2 dot add this nums of i so this is our array we have created we are up to this point now we have done this point"
+  },
+  {
+    "rank": 3,
+    "score": 40.5,
+    "start": 236.52,
+    "end": 325.36,
+    "text": "so we have to make a cancer array and we have to append the element in order so we have to make a cancer array before the loop is finished so int of cancer array is new in same size of nums dot length and size of this so we have got 3 index int of index int of index equals to 0 this is for cancer array cancer array and this is the id rate in order and int of index 1 this is for list 1 or int of index 2 this is for 0 this is for list 2 so we will append the list 1 while index 1 is less than list list of 1 dot size so what to do so answer rr of int plus plus this will be this will become list 1 dot get int1 plus so here int1 plus plus plus so this will append all the elements of list 1 in our answer array and we will do same thing for this list 2 while index of 2 less than list 2 dot size answer array rr of index plus plus will be list 2 dot get index 2 plus plus and area so it is done and we will return written our answer rr so I think it should work and they think scope"
+  }
+]
