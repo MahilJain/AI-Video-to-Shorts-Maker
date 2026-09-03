@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import json
 import os
 import subprocess
@@ -31,7 +31,7 @@ def main():
     run_step(
         "Downloading video",
         [
-            "python", "-m", "yt_dlp",
+            sys.executable, "-m", "yt_dlp",
             "-f", "bestvideo[height<=720]+bestaudio",
             "--merge-output-format", "mp4",
             "-o", video_name,
@@ -42,38 +42,38 @@ def main():
     # Step 2: Transcribe
     run_step(
         "Transcribing video",
-        ["python", "-u", "transcribe.py", video_name],
+        [sys.executable, "-u", "transcribe.py", video_name],
     )
 
     # Step 3: Select segments
     if args.rule_based:
         run_step(
             "Selecting segments (rule-based)",
-            ["python", "-u", "select_segments.py", transcript_json],
+            [sys.executable, "-u", "select_segments.py", transcript_json],
         )
     else:
         run_step(
             "Selecting segments (Groq LLM)",
-            ["python", "-u", "select_segments_groq.py", transcript_json],
+            [sys.executable, "-u", "select_segments_groq.py", transcript_json],
         )
 
     # Step 4: Cut clips
     run_step(
         "Cutting clips",
-        ["python", "-u", "cut_clips.py", video_name, clips_json],
+        [sys.executable, "-u", "cut_clips.py", video_name, clips_json],
     )
 
     # Step 5: Reframe to vertical (face-tracked)
     run_step(
         "Reframing to vertical (face-tracked)",
-        ["python", "-u", "reframe_vertical_tracked.py", "clips_output"],
+        [sys.executable, "-u", "reframe_vertical_tracked.py", "clips_output"],
     )
 
     # Step 6: Burn captions
     run_step(
         "Generating and burning captions",
         [
-            "python", "-u", "generate_captions.py",
+            sys.executable, "-u", "generate_captions.py",
             transcript_json, clips_json, "clips_output/vertical_tracked",
         ],
     )

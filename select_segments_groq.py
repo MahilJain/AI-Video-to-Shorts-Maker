@@ -2,6 +2,9 @@ import json
 import os
 import sys
 from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MODEL = "openai/gpt-oss-20b"
 

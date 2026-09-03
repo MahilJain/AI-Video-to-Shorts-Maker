@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import json
 import os
 
@@ -27,9 +27,9 @@ def main() -> None:
         from faster_whisper import WhisperModel
 
         # Use the local CPU-friendly model so transcription does not require a GPU.
-        model = WhisperModel("base", device="cpu", compute_type="int8")
+        model = WhisperModel("small", device="cpu", compute_type="int8")
         # Request word timestamps because later stages use precise clip and caption timing.
-        segments, info = model.transcribe(video_path, word_timestamps=True)
+        segments, info = model.transcribe(video_path, word_timestamps=True, language="hi")
 
         print(f"Detected language: {info.language}")
         print(f"Duration: {info.duration:.2f} seconds\n")
