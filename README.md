@@ -77,7 +77,7 @@ python -m yt_dlp -f "bestvideo[height<=720]+bestaudio" -o "test_video.mp4" "YOUT
 
 **2. Transcribe it:**
 ```bash
-python transcribe.py
+python src/legacy_or_optional/transcribe.py
 ```
 
 This generates `transcript.json` — a structured transcript with sentence and word-level timestamps, ready for the next stage of the pipeline (segment selection).
@@ -88,12 +88,28 @@ This generates `transcript.json` — a structured transcript with sentence and w
 
 ```
 shorts-clipper/
-├── venv/                 # virtual environment (not tracked)
-├── transcribe.py         # download → transcribe pipeline
-├── transcript.json        # generated transcript with timestamps
-├── test_video.mp4         # sample downloaded video (not tracked)
+├── src/
+│   ├── transcribe_groq.py            # Groq transcription
+│   ├── select_segments_groq.py       # LLM-based segment selection
+│   ├── cut_clips.py                  # ffmpeg clip cutting
+│   ├── reframe_vertical_tracked.py   # face-tracked vertical reframing
+│   └── legacy_or_optional/
+│       ├── transcribe.py             # local transcription
+│       ├── select_segments.py        # rule-based selection
+│       ├── reframe_vertical.py       # center-crop reframing
+│       ├── generate_captions.py      # optional caption generation
+│       └── romanize_hinglish.py      # optional Hinglish romanization
+├── models/
+│   └── blaze_face_short_range.tflite # MediaPipe face detector model
+├── run_pipeline.py                   # root entry point
+├── requirements.txt
+├── transcript.json                    # generated artifact (not tracked)
+├── clips_output/                      # generated clips (not tracked)
 └── .gitignore
 ```
+
+The pipeline scripts write generated artifacts to the project root so they remain
+easy to find and continue to match the existing `.gitignore` rules.
 
 ---
 

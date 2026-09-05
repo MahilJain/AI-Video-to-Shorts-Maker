@@ -6,6 +6,10 @@ import subprocess
 import sys
 
 
+SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+LEGACY_DIR = os.path.join(SRC_DIR, "legacy_or_optional")
+
+
 def run_step(description: str, cmd: list) -> None:
     print(f"\n{'='*60}")
     print(f"STEP: {description}")
@@ -73,28 +77,28 @@ def main():
 
     run_step(
         "Transcribing audio (Groq whisper-large-v3-turbo)",
-        [sys.executable, "-u", "transcribe_groq.py", audio_name],
+        [sys.executable, "-u", os.path.join(SRC_DIR, "transcribe_groq.py"), audio_name],
     )
 
     if args.rule_based:
         run_step(
             "Selecting segments (rule-based)",
-            [sys.executable, "-u", "select_segments.py", transcript_json],
+            [sys.executable, "-u", os.path.join(LEGACY_DIR, "select_segments.py"), transcript_json],
         )
     else:
         run_step(
             "Selecting segments (Groq LLM)",
-            [sys.executable, "-u", "select_segments_groq.py", transcript_json],
+            [sys.executable, "-u", os.path.join(SRC_DIR, "select_segments_groq.py"), transcript_json],
         )
 
     run_step(
         "Cutting clips",
-        [sys.executable, "-u", "cut_clips.py", video_name, clips_json],
+        [sys.executable, "-u", os.path.join(SRC_DIR, "cut_clips.py"), video_name, clips_json],
     )
 
     run_step(
         "Reframing to vertical (face-tracked)",
-        [sys.executable, "-u", "reframe_vertical_tracked.py", "clips_output"],
+        [sys.executable, "-u", os.path.join(SRC_DIR, "reframe_vertical_tracked.py"), "clips_output"],
     )
 
     final_dir = os.path.abspath("clips_output/vertical_tracked")

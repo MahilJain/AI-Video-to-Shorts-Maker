@@ -7,7 +7,11 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 
 
-MODEL_PATH = "blaze_face_short_range.tflite"
+MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "models",
+    "blaze_face_short_range.tflite",
+)
 
 
 def detect_face_centers(video_path: str, sample_every_n_frames: int = 5) -> list:
