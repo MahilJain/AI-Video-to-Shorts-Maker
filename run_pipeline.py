@@ -1,6 +1,7 @@
-import argparse
+﻿import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -15,19 +16,41 @@ def run_step(description: str, cmd: list) -> None:
         sys.exit(1)
 
 
+def clean_previous_run(video_name: str, audio_name: str) -> None:
+    """Remove artifacts from any previous run so a new URL always
+    produces fresh output instead of silently reusing stale files."""
+    files_to_remove = [
+        video_name,
+        audio_name,
+        "transcript.json",
+        "clip_candidates.json",
+        "clip_candidates_llm.json",
+    ]
+    for f in files_to_remove:
+        if os.path.exists(f):
+            os.remove(f)
+
+    if os.path.exists("clips_output"):
+        shutil.rmtree("clips_output")
+
+    print("Cleared previous run's files (video, audio, transcript, clips).")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Full YouTube-to-Shorts pipeline")
     parser.add_argument("url", help="YouTube video URL")
     parser.add_argument("--video-name", default="input_video.mp4", help="Filename to save the downloaded video as")
-    parser.add_argument("--use-llm", action="store_true", default=True, help="Use Groq LLM for segment selection (default: True)")
+    parser.add_argument("--audio-name", default="input_audio.mp3", help="Filename for the extracted audio")
     parser.add_argument("--rule-based", action="store_true", help="Use rule-based selection instead of LLM")
     args = parser.parse_args()
 
     video_name = args.video_name
+    audio_name = args.audio_name
     transcript_json = "transcript.json"
     clips_json = "clip_candidates_llm.json" if not args.rule_based else "clip_candidates.json"
 
-    # Step 1: Download
+    clean_previous_run(video_name, audio_name)
+
     run_step(
         "Downloading video",
         [
@@ -39,13 +62,20 @@ def main():
         ],
     )
 
-    # Step 2: Transcribe
     run_step(
-        "Transcribing video",
-        [sys.executable, "-u", "transcribe.py", video_name],
+        "Extracting audio",
+        [
+            "ffmpeg", "-y", "-i", video_name,
+            "-vn", "-acodec", "libmp3lame", "-q:a", "4",
+            audio_name,
+        ],
     )
 
-    # Step 3: Select segments
+    run_step(
+        "Transcribing audio (Groq whisper-large-v3-turbo)",
+        [sys.executable, "-u", "transcribe_groq.py", audio_name],
+    )
+
     if args.rule_based:
         run_step(
             "Selecting segments (rule-based)",
@@ -57,28 +87,17 @@ def main():
             [sys.executable, "-u", "select_segments_groq.py", transcript_json],
         )
 
-    # Step 4: Cut clips
     run_step(
         "Cutting clips",
         [sys.executable, "-u", "cut_clips.py", video_name, clips_json],
     )
 
-    # Step 5: Reframe to vertical (face-tracked)
     run_step(
         "Reframing to vertical (face-tracked)",
         [sys.executable, "-u", "reframe_vertical_tracked.py", "clips_output"],
     )
 
-    # Step 6: Burn captions
-    run_step(
-        "Generating and burning captions",
-        [
-            sys.executable, "-u", "generate_captions.py",
-            transcript_json, clips_json, "clips_output/vertical_tracked",
-        ],
-    )
-
-    final_dir = os.path.abspath("clips_output/vertical_tracked/captioned")
+    final_dir = os.path.abspath("clips_output/vertical_tracked")
     print(f"\n{'='*60}")
     print(f"PIPELINE COMPLETE")
     print(f"Final clips are in: {final_dir}")
