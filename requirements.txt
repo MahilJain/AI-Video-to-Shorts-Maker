@@ -1,3 +1,6 @@
 yt-dlp
 faster-whisper
 python-dotenv
+groq
+mediapipe
+opencv-python

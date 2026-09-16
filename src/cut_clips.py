@@ -1,12 +1,8 @@
-﻿import json
+﻿"""Cut selected timestamp ranges from the source video with ffmpeg."""
+
 import os
-import subprocess
 import sys
-
-
-def load_clips(path: str) -> list[dict]:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+from utils import load_json, resolve_project_path, run_ffmpeg
 
 
 def cut_clip(source_video: str, start: float, end: float, output_path: str) -> None:
@@ -22,12 +18,7 @@ def cut_clip(source_video: str, start: float, end: float, output_path: str) -> N
         "-avoid_negative_ts", "make_zero",
         output_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ffmpeg failed for {output_path}:")
-        print(result.stderr[-500:])  # last 500 chars of error, usually the useful part
-    else:
-        print(f"Saved: {output_path}")
+    run_ffmpeg(cmd, output_path)
 
 
 def main():
@@ -36,15 +27,15 @@ def main():
         print("Example: python cut_clips.py test_video2.mp4 clip_candidates_llm.json")
         return
 
-    source_video = sys.argv[1]
-    clips_json = sys.argv[2]
+    source_video = resolve_project_path(sys.argv[1])
+    clips_json = resolve_project_path(sys.argv[2])
 
     if not os.path.exists(source_video):
         print(f"Error: source video '{source_video}' not found.")
         return
 
-    clips = load_clips(clips_json)
-    output_dir = "clips_output"
+    clips = load_json(clips_json)
+    output_dir = resolve_project_path("clips_output")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Cutting {len(clips)} clips from {source_video}...\n")

@@ -1,17 +1,12 @@
-﻿import json
+﻿"""Optional Groq-powered conversion of Hindi transcript text to Roman Hinglish."""
+
 import os
 import sys
 from groq import Groq
-from dotenv import load_dotenv
-
-load_dotenv()
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import get_groq_api_key, load_json, save_json
 
 MODEL = "openai/gpt-oss-20b"
-
-
-def load_transcript(path: str) -> list[dict]:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def romanize_batch(client: Groq, texts: list[str]) -> list[str]:
@@ -49,8 +44,8 @@ def main():
     transcript_path = sys.argv[1] if len(sys.argv) > 1 else "transcript.json"
     output_path = sys.argv[2] if len(sys.argv) > 2 else "transcript_hinglish.json"
 
-    transcript = load_transcript(transcript_path)
-    api_key = os.environ.get("GROQ_API_KEY")
+    transcript = load_json(transcript_path)
+    api_key = get_groq_api_key()
     if not api_key:
         raise RuntimeError("GROQ_API_KEY not set (check your .env file).")
     client = Groq(api_key=api_key)
@@ -74,10 +69,8 @@ def main():
 
         print(f"  Processed segments {i+1}-{min(i+batch_size, len(transcript))}")
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(transcript, f, indent=2, ensure_ascii=False)
-
-    print(f"\nSaved Hinglish transcript to {os.path.abspath(output_path)}")
+    saved_path = save_json(transcript, output_path)
+    print(f"\nSaved Hinglish transcript to {saved_path}")
 
 
 if __name__ == "__main__":

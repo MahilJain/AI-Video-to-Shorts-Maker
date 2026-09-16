@@ -1,6 +1,11 @@
+"""Optional local faster-whisper transcription fallback."""
+
 import argparse
-import json
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import resolve_project_path, save_json
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,7 +23,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Transcribe a video and save its timestamped transcript as JSON."""
     args = parse_args()
-    video_path = os.path.abspath(args.video_filename)
+    video_path = resolve_project_path(args.video_filename)
 
     try:
         if not os.path.isfile(video_path):
@@ -62,10 +67,9 @@ def main() -> None:
     except OSError as error:
         raise SystemExit(f"Error loading or transcribing video '{video_path}': {error}")
 
-    output_path = os.path.abspath("transcript.json")
+    output_path = resolve_project_path("transcript.json")
     print(f"Writing transcript to: {output_path}")
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(transcript_data, file, indent=2, ensure_ascii=False)
+    save_json(transcript_data, output_path)
 
     print(f"Saved transcript to {output_path}")
 

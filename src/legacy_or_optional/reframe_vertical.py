@@ -1,6 +1,9 @@
-﻿import os
-import subprocess
+﻿"""Optional center-crop vertical reframing fallback without face tracking."""
+
+import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import resolve_project_path, run_ffmpeg
 
 
 def reframe_to_vertical(input_path: str, output_path: str) -> None:
@@ -18,12 +21,7 @@ def reframe_to_vertical(input_path: str, output_path: str) -> None:
         "-c:a", "aac",
         output_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ffmpeg failed for {output_path}:")
-        print(result.stderr[-500:])
-    else:
-        print(f"Saved: {output_path}")
+    run_ffmpeg(cmd, output_path)
 
 
 def main():
@@ -32,7 +30,7 @@ def main():
         print("Example: python reframe_vertical.py clips_output")
         return
 
-    clips_folder = sys.argv[1]
+    clips_folder = resolve_project_path(sys.argv[1])
     output_dir = os.path.join(clips_folder, "vertical")
     os.makedirs(output_dir, exist_ok=True)
 

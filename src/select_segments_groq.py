@@ -1,17 +1,11 @@
+﻿"""Use Groq's LLM to select compelling, self-contained transcript segments."""
+
 import json
-import os
 import sys
 from groq import Groq
-from dotenv import load_dotenv
-
-load_dotenv()
+from utils import get_groq_api_key, load_json, resolve_project_path, save_json
 
 MODEL = "openai/gpt-oss-20b"
-
-
-def load_transcript(path: str) -> list[dict]:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def build_prompt(transcript: list[dict]) -> str:
@@ -41,7 +35,7 @@ Transcript:
 
 
 def call_groq(prompt: str) -> str:
-    api_key = os.environ.get("GROQ_API_KEY")
+    api_key = get_groq_api_key()
     if not api_key:
         raise RuntimeError("GROQ_API_KEY environment variable not set.")
 
@@ -57,8 +51,8 @@ def call_groq(prompt: str) -> str:
 
 
 def main():
-    transcript_path = sys.argv[1] if len(sys.argv) > 1 else "transcript.json"
-    transcript = load_transcript(transcript_path)
+    transcript_path = resolve_project_path(sys.argv[1] if len(sys.argv) > 1 else "transcript.json")
+    transcript = load_json(transcript_path)
 
     print(f"Sending transcript ({len(transcript)} segments) to Groq ({MODEL})...")
     prompt = build_prompt(transcript)
@@ -83,9 +77,8 @@ def main():
         print(f"#{i} | {clip['start']:.1f}s -> {clip['end']:.1f}s ({duration:.1f}s)")
         print(f"   Reason: {clip['reason']}\n")
 
-    with open("clip_candidates_llm.json", "w", encoding="utf-8") as f:
-        json.dump(clips, f, indent=2, ensure_ascii=False)
-    print("Saved to clip_candidates_llm.json")
+    output_path = save_json(clips, "clip_candidates_llm.json")
+    print(f"Saved to {output_path}")
 
 
 if __name__ == "__main__":

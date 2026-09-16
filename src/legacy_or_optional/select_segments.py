@@ -1,6 +1,11 @@
-﻿import argparse
-import json
+﻿"""Optional rule-based segment selector retained for offline pipeline runs."""
+
+import argparse
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import load_json, resolve_project_path, save_json
 
 # Keep clips within the target duration range for short-form video.
 MIN_CLIP_LEN = 30
@@ -100,10 +105,12 @@ def pick_top_non_overlapping(
 
 def main() -> None:
     """Load a transcript, select clips, and save the ranked candidates as JSON."""
+    if hasattr(sys.stdout, "reconfigure"):
+        # Windows consoles may default to cp1252 while Hindi transcripts need UTF-8.
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
-    transcript_path = os.path.abspath(args.transcript_filename)
-    with open(transcript_path, "r", encoding="utf-8") as file:
-        transcript = json.load(file)
+    transcript_path = resolve_project_path(args.transcript_filename)
+    transcript = load_json(transcript_path)
 
     candidates = find_candidate_windows(transcript)
     scored = [(score_window(window), window) for window in candidates]
@@ -122,10 +129,9 @@ def main() -> None:
         print(f"   \"{text[:120]}...\"\n")
         results.append({"rank": rank, "score": score, "start": start, "end": end, "text": text})
 
-    output_path = os.path.abspath("clip_candidates.json")
+    output_path = resolve_project_path("clip_candidates.json")
     print(f"Writing clip candidates to: {output_path}")
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(results, file, indent=2, ensure_ascii=False)
+    save_json(results, output_path)
 
     print(f"Saved to {output_path}")
 

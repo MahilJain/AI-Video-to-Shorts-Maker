@@ -1,10 +1,12 @@
-﻿import os
-import subprocess
+﻿"""Detect a speaker's face and reframe each selected clip to 9:16."""
+
+import os
 import sys
 import cv2
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
+from utils import resolve_project_path, run_ffmpeg
 
 
 MODEL_PATH = os.path.join(
@@ -69,7 +71,6 @@ def smooth_centers(centers: list, window: int = 5) -> list:
 def reframe_to_vertical_tracked(input_path: str, output_path: str) -> None:
     cap = cv2.VideoCapture(input_path)
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_width_check = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     cap.release()
 
     crop_width = int(frame_height * 9 / 16)
@@ -90,12 +91,7 @@ def reframe_to_vertical_tracked(input_path: str, output_path: str) -> None:
         "ffmpeg", "-y", "-i", input_path, "-vf", vf,
         "-c:v", "libx264", "-c:a", "aac", output_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  ffmpeg failed for {output_path}:")
-        print(result.stderr[-500:])
-    else:
-        print(f"  Saved: {output_path}")
+    run_ffmpeg(cmd, output_path)
 
 
 def main():
@@ -103,7 +99,7 @@ def main():
         print("Usage: python reframe_vertical_tracked.py <clips_folder>")
         return
 
-    clips_folder = sys.argv[1]
+    clips_folder = resolve_project_path(sys.argv[1])
     output_dir = os.path.join(clips_folder, "vertical_tracked")
     os.makedirs(output_dir, exist_ok=True)
 

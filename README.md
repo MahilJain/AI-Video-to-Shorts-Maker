@@ -9,7 +9,7 @@ Shorts Clipper ingests a long-form YouTube video, transcribes it, intelligently 
 ## ✨ Features
 
 - 📥 **Download** any YouTube video via `yt-dlp`
-- 🗣️ **Transcribe** with word-level timestamps using local, free `faster-whisper`
+- 🗣️ **Transcribe** with word-level timestamps using Groq's Whisper API
 - 🎯 **Auto-detect** the best 30–90 second segments (hook + payoff, never cuts mid-sentence)
 - ✂️ **Auto-cut** clips with `ffmpeg`
 - 💬 **Auto-caption** clips, karaoke-style word-by-word highlighting
@@ -65,22 +65,19 @@ venv\Scripts\activate        # Windows
 # source venv/bin/activate   # Mac/Linux
 
 # Install dependencies
-pip install yt-dlp faster-whisper
+pip install -r requirements.txt
 ```
 
 ### Usage
 
-**1. Download a video:**
+Run the complete pipeline from any working directory:
 ```bash
-python -m yt_dlp -f "bestvideo[height<=720]+bestaudio" -o "test_video.mp4" "YOUTUBE_URL"
+python path\to\shorts-clipper\run_pipeline.py "YOUTUBE_URL"
 ```
 
-**2. Transcribe it:**
-```bash
-python src/legacy_or_optional/transcribe.py
-```
-
-This generates `transcript.json` — a structured transcript with sentence and word-level timestamps, ready for the next stage of the pipeline (segment selection).
+Set `GROQ_API_KEY` in `shorts-clipper/.env` before running. The downloaded video
+is sent directly to Groq; no intermediate audio extraction is needed. Use
+`--rule-based` to select segments without the LLM selector.
 
 ---
 

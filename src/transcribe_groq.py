@@ -1,11 +1,10 @@
-﻿import argparse
-import json
+﻿"""Transcribe downloaded media with Groq Whisper and write word-timestamped JSON."""
+
+import argparse
 import os
 import sys
 from groq import Groq
-from dotenv import load_dotenv
-
-load_dotenv()
+from utils import get_groq_api_key, resolve_project_path, save_json
 
 MODEL = "whisper-large-v3-turbo"
 
@@ -23,24 +22,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    video_path = os.path.abspath(args.video_filename)
+    video_path = resolve_project_path(args.video_filename)
 
     if not os.path.isfile(video_path):
         raise FileNotFoundError(video_path)
 
-    api_key = os.environ.get("GROQ_API_KEY")
+    api_key = get_groq_api_key()
     if not api_key:
         raise RuntimeError("GROQ_API_KEY not set (check your .env file).")
 
     client = Groq(api_key=api_key)
 
     print(f"Sending {os.path.basename(video_path)} to Groq ({MODEL}) for transcription...")
-    print("(Groq accepts audio/video files directly — no separate audio extraction needed)")
+    print("(Groq accepts audio/video files directly � no separate audio extraction needed)")
 
     with open(video_path, "rb") as f:
         transcription = client.audio.transcriptions.create(
             file=(os.path.basename(video_path), f.read()),
             model=MODEL,
+            # The source videos are Hindi/Hinglish; fixing this avoids poor auto-detection.
             language="hi",
             response_format="verbose_json",
             timestamp_granularities=["word", "segment"],
@@ -80,8 +80,7 @@ def main() -> None:
 
     output_path = os.path.join(os.path.dirname(video_path), "transcript.json")
     print(f"\nWriting transcript to: {output_path}")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(transcript_data, f, indent=2, ensure_ascii=False)
+    save_json(transcript_data, output_path)
 
     print(f"Saved transcript to {output_path}")
 

@@ -1,12 +1,9 @@
-﻿import json
+﻿"""Optional caption generator that burns grouped word timestamps into vertical clips."""
+
 import os
-import subprocess
 import sys
-
-
-def load_json(path: str) -> list:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import load_json, resolve_project_path, run_ffmpeg
 
 
 def get_words_in_range(transcript: list, clip_start: float, clip_end: float) -> list:
@@ -83,12 +80,7 @@ def burn_captions(video_path: str, ass_path: str, output_path: str) -> None:
         "-c:a", "copy",
         output_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  ffmpeg failed for {output_path}:")
-        print(result.stderr[-800:])
-    else:
-        print(f"  Saved: {output_path}")
+    run_ffmpeg(cmd, output_path, error_tail=800)
 
 
 def main():
@@ -99,7 +91,7 @@ def main():
 
     transcript_path = sys.argv[1]
     clips_json_path = sys.argv[2]
-    vertical_folder = sys.argv[3] if len(sys.argv) > 3 else "clips_output/vertical_tracked"
+    vertical_folder = resolve_project_path(sys.argv[3]) if len(sys.argv) > 3 else resolve_project_path("clips_output/vertical_tracked")
 
     transcript = load_json(transcript_path)
     clips = load_json(clips_json_path)
