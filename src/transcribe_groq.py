@@ -2,11 +2,16 @@
 
 import argparse
 import os
+import subprocess
 import sys
+import tempfile
+
 from groq import Groq
 from utils import get_groq_api_key, resolve_project_path, save_json
 
 MODEL = "whisper-large-v3-turbo"
+MAX_GROQ_UPLOAD_BYTES = 25 * 1024 * 1024
+SAFE_UPLOAD_BYTES = 24 * 1024 * 1024
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +23,60 @@ def parse_args() -> argparse.Namespace:
         help="Video filename or path (default: test_video.mp4)",
     )
     return parser.parse_args()
+
+
+def prepare_upload(video_path: str) -> tuple[str, str | None]:
+    """Return an API-compatible media path and an optional temporary file to remove."""
+    if os.path.getsize(video_path) <= SAFE_UPLOAD_BYTES:
+        return video_path, None
+
+    temporary_file = tempfile.NamedTemporaryFile(
+        prefix="groq_transcription_",
+        suffix=".mp3",
+        dir=os.path.dirname(video_path),
+        delete=False,
+    )
+    audio_path = temporary_file.name
+    temporary_file.close()
+
+    print(
+        f"Input is {os.path.getsize(video_path) / 1_000_000:.1f} MB; "
+        "compressing audio to fit Groq's 25 MB upload limit..."
+    )
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i", video_path,
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-c:a", "libmp3lame",
+            "-b:a", "32k",
+            audio_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        try:
+            os.remove(audio_path)
+        except FileNotFoundError:
+            pass
+        raise RuntimeError(f"Could not prepare compressed audio with ffmpeg:\n{result.stderr[-1000:]}")
+
+    if os.path.getsize(audio_path) > MAX_GROQ_UPLOAD_BYTES:
+        size_mb = os.path.getsize(audio_path) / 1_000_000
+        try:
+            os.remove(audio_path)
+        except FileNotFoundError:
+            pass
+        raise RuntimeError(
+            f"Compressed audio is still {size_mb:.1f} MB, above Groq's 25 MB upload limit. "
+            "Use a shorter input video."
+        )
+
+    return audio_path, audio_path
 
 
 def main() -> None:
@@ -33,18 +92,21 @@ def main() -> None:
 
     client = Groq(api_key=api_key)
 
-    print(f"Sending {os.path.basename(video_path)} to Groq ({MODEL}) for transcription...")
-    print("(Groq accepts audio/video files directly � no separate audio extraction needed)")
-
-    with open(video_path, "rb") as f:
-        transcription = client.audio.transcriptions.create(
-            file=(os.path.basename(video_path), f.read()),
-            model=MODEL,
-            # The source videos are Hindi/Hinglish; fixing this avoids poor auto-detection.
-            language="hi",
-            response_format="verbose_json",
-            timestamp_granularities=["word", "segment"],
-        )
+    upload_path, temporary_upload = prepare_upload(video_path)
+    try:
+        print(f"Sending {os.path.basename(upload_path)} to Groq ({MODEL}) for transcription...")
+        with open(upload_path, "rb") as f:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(upload_path), f.read()),
+                model=MODEL,
+                # The source videos are Hindi/Hinglish; fixing this avoids poor auto-detection.
+                language="hi",
+                response_format="verbose_json",
+                timestamp_granularities=["word", "segment"],
+            )
+    finally:
+        if temporary_upload:
+            os.remove(temporary_upload)
 
     print(f"Detected language: {transcription.language}")
     print(f"Duration: {transcription.duration:.2f} seconds\n")
