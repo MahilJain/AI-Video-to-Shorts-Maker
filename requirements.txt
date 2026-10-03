@@ -4,3 +4,7 @@ python-dotenv
 groq
 mediapipe
 opencv-python
+fastapi>=0.115.0
+starlette>=0.40.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9

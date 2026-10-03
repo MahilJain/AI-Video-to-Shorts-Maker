@@ -5,4 +5,6 @@ __pycache__/
 *.wav
 transcript.json
 *.env
-
+frontend/node_modules/
+frontend/dist/
+clips_output_jobs/
