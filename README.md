@@ -31,7 +31,7 @@ python -m venv venv
 python -m pip install -r requirements.txt
 ```
 
-Add your Groq API key to `shorts-clipper/.env`:
+Add your Groq API key to `.env` in the project root:
 
 ```text
 GROQ_API_KEY=your_groq_api_key
@@ -100,8 +100,15 @@ shorts-clipper/
 ├── run_pipeline.py                # Pipeline orchestrator
 ├── requirements.txt               # Python dependencies
 ├── src/                            # Transcription, selection, cutting, reframing
+│   ├── select_segments.py         # Optional rule-based segment selection
+│   └── legacy_or_optional/        # Standalone alternatives not used by the API flow
 ├── models/                         # Face detection model
-├── frontend/                       # React + Vite app
+├── frontend/src/
+│   ├── api/client.js              # Shared API requests and error handling
+│   ├── components/                # Form, progress, results, and feature UI
+│   ├── hooks/useVideoJob.js       # Job submission and progress polling
+│   ├── App.jsx                    # Page composition
+│   └── style.css                  # Responsive visual system
 ├── clips_output/                   # Pipeline output (generated)
 └── clips_output_jobs/              # Per-job API clip snapshots (generated)
 ```
