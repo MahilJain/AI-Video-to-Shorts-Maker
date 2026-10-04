@@ -1,4 +1,4 @@
-﻿"""Optional rule-based segment selector retained for offline pipeline runs."""
+"""Rule-based segment selector used when the pipeline runs without Groq."""
 
 import argparse
 import os
