@@ -10,7 +10,6 @@ from src.utils import PROJECT_ROOT, resolve_project_path
 
 
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
-LEGACY_DIR = os.path.join(SRC_DIR, "legacy_or_optional")
 
 
 def run_step(description: str, cmd: list) -> None:
@@ -79,7 +78,12 @@ def main():
     if args.rule_based:
         run_step(
             "Selecting segments (rule-based)",
-            [sys.executable, "-u", os.path.join(LEGACY_DIR, "select_segments.py"), resolve_project_path(transcript_json)],
+            [
+                sys.executable,
+                "-u",
+                os.path.join(SRC_DIR, "select_segments.py"),
+                resolve_project_path(transcript_json),
+            ],
         )
     else:
         run_step(
