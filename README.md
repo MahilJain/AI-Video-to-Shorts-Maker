@@ -9,6 +9,8 @@ and a React/Vite web application.
 - Download public YouTube videos with `yt-dlp`.
 - Transcribe speech with Groq Whisper and select clip-worthy moments with a
   Groq language model (or use the optional rule-based selector).
+- Split long transcripts into smaller Groq requests and pace requests to stay
+  under the configured token-per-minute budget.
 - Cut selected segments and reframe them to 9:16 using MediaPipe face tracking.
 - Submit and monitor processing jobs through the web app or REST API.
 - Preview and download completed clips.
@@ -68,7 +70,9 @@ available at <http://localhost:8000/docs>.
 
 Processing can take several minutes. Only one job runs at a time because jobs
 share intermediate pipeline files. Job state is held in memory and is lost
-when the backend restarts.
+when the backend restarts. Long transcripts are analyzed in sequential chunks;
+the selector may pause between requests to respect Groq's free-tier token
+limits, so long videos can take longer to process.
 
 For deployment, build the frontend with `npm run build` and serve `frontend/dist`
 from a static web server. Route `/api` to the backend or configure
