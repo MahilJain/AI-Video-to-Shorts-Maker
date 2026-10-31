@@ -6,7 +6,7 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
-from utils import resolve_project_path, run_ffmpeg
+from .utils import resolve_project_path, run_ffmpeg
 
 
 MODEL_PATH = os.path.join(

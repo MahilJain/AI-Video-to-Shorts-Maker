@@ -2,7 +2,7 @@
 
 import os
 import sys
-from utils import load_json, resolve_project_path, run_ffmpeg
+from .utils import load_json, resolve_project_path, run_ffmpeg
 
 
 def cut_clip(source_video: str, start: float, end: float, output_path: str) -> None:

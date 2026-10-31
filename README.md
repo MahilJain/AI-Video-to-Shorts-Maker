@@ -1,118 +1,128 @@
 # Shorts Clipper
 
-Turn a public YouTube video into short, face-tracked vertical clips. The
-project includes a Python video-processing pipeline, a FastAPI job API, and a
-React web interface.
+Shorts Clipper turns a public YouTube video into short, face-tracked vertical
+clips. It consists of a FastAPI backend, a Python video-processing pipeline,
+and a React/Vite web application.
 
 ## Features
 
-- Download videos with `yt-dlp`.
-- Transcribe speech and select clip-worthy moments with Groq.
-- Cut candidate segments and reframe them vertically with MediaPipe face
-  tracking.
-- Submit a video from the web app and follow its pipeline progress.
-- Preview and download clips, with the candidate's reason shown when available.
+- Download public YouTube videos with `yt-dlp`.
+- Transcribe speech with Groq Whisper and select clip-worthy moments with a
+  Groq language model (or use the optional rule-based selector).
+- Cut selected segments and reframe them to 9:16 using MediaPipe face tracking.
+- Submit and monitor processing jobs through the web app or REST API.
+- Preview and download completed clips.
 
 ## Requirements
 
 - Python 3.10 or later
 - Node.js 20 or later and npm
-- FFmpeg available on your `PATH`
+- FFmpeg available on `PATH`
 - A Groq API key
-- Deno, if required by your `yt-dlp` YouTube setup
+- Deno, if required by your `yt-dlp` YouTube configuration
 
-## Setup
+## Configuration
 
-Run these commands from the project root (`shorts-clipper`):
-
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-```
-
-Add your Groq API key to `.env` in the project root:
+Create a `.env` file in the project root and set your Groq API key:
 
 ```text
 GROQ_API_KEY=your_groq_api_key
 ```
 
-Install the frontend dependencies:
+Do not commit `.env` or real API keys. The backend loads this file from the
+project root. For a frontend hosted separately from the API, set
+`VITE_API_BASE_URL` in the frontend environment to the backend's base URL; the
+default local setup uses the Vite `/api` proxy.
+
+## Install
+
+Run commands from the `shorts-clipper` project root. On Windows PowerShell:
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend\requirements.txt
 Set-Location frontend
 npm install
 Set-Location ..
 ```
 
-## Run the application
+## Run locally
 
-Start the API from the project root in the first terminal:
+Start the backend from the project root:
 
 ```powershell
-.\venv\Scripts\python.exe -m uvicorn api:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Start Vite in a second terminal:
+In another terminal, start the frontend:
 
 ```powershell
 Set-Location frontend
 npm run dev
 ```
 
-Open the URL printed by Vite, normally <http://localhost:5173>. The frontend's
-development server proxies API requests to <http://localhost:8000>. Interactive
-API documentation is available at <http://localhost:8000/docs>.
+Open the URL printed by Vite, normally <http://localhost:5173>. Vite proxies
+`/api` requests to <http://localhost:8000>. Interactive API documentation is
+available at <http://localhost:8000/docs>.
 
-Paste a public YouTube video URL into the app and select **Generate clips**.
-Processing can take a few minutes. The app displays the active pipeline step
-and, when processing finishes, provides video previews and download links.
+Processing can take several minutes. Only one job runs at a time because jobs
+share intermediate pipeline files. Job state is held in memory and is lost
+when the backend restarts.
 
-### Run the pipeline without the web app
+For deployment, build the frontend with `npm run build` and serve `frontend/dist`
+from a static web server. Route `/api` to the backend or configure
+`VITE_API_BASE_URL`. The current backend is intended for a single process and
+worker: job state is in memory and pipeline files are shared, so multiple
+workers or replicas are not supported.
 
-From the project root:
+## Run the pipeline from the command line
 
 ```powershell
-.\venv\Scripts\python.exe run_pipeline.py "https://www.youtube.com/watch?v=VIDEO_ID"
+python -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-Add `--rule-based` to use rule-based segment selection instead of the Groq LLM.
+Pass `--rule-based` to select segments without the Groq language model:
 
-## API
+```powershell
+python -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID" --rule-based
+```
+
+## REST API
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/process` | Submit `{"url": "https://..."}` and receive a `job_id`. |
-| `GET` | `/api/status/{job_id}` | Poll job status and the current `progress` step. |
-| `GET` | `/api/jobs/{job_id}/clips` | List completed clips with filename, duration, and reason when available. |
-| `GET` | `/api/jobs/{job_id}/clips/{filename}` | Stream a clip with byte-range support for playback; add `?download=true` to download it. |
+| `GET` | `/api/status/{job_id}` | Get the job state and current pipeline step. |
+| `GET` | `/api/jobs/{job_id}/clips` | List completed clips, durations, and selection reasons. |
+| `GET` | `/api/jobs/{job_id}/clips/{filename}` | Stream a clip; add `?download=true` to download it. |
 
-Jobs are kept in memory, so they do not survive an API server restart. Only one
-pipeline job can run at a time because the pipeline uses shared intermediate
-files. Completed clip files are saved separately per job under
-`clips_output_jobs/`.
+Completed clips are copied into `clips_output_jobs/` so results remain
+available independently of the pipeline's temporary output.
 
-## Project structure
+## Project layout
 
 ```text
 shorts-clipper/
-├── api.py                         # FastAPI job and clip endpoints
-├── run_pipeline.py                # Pipeline orchestrator
-├── requirements.txt               # Python dependencies
-├── src/                            # Transcription, selection, cutting, reframing
-│   ├── select_segments.py         # Optional rule-based segment selection
-│   └── legacy_or_optional/        # Standalone alternatives not used by the API flow
-├── models/                         # Face detection model
-├── frontend/src/
-│   ├── api/client.js              # Shared API requests and error handling
-│   ├── components/                # Form, progress, results, and feature UI
-│   ├── hooks/useVideoJob.js       # Job submission and progress polling
-│   ├── App.jsx                    # Page composition
-│   └── style.css                  # Responsive visual system
-├── clips_output/                   # Pipeline output (generated)
-└── clips_output_jobs/              # Per-job API clip snapshots (generated)
+├── backend/
+│   ├── api.py                 # FastAPI endpoints and background job handling
+│   ├── run_pipeline.py        # Pipeline orchestration and CLI
+│   ├── requirements.txt       # Python dependencies
+│   ├── models/                # MediaPipe face detection model
+│   └── pipeline/              # Transcription, selection, cutting, reframing
+│       └── legacy_or_optional/ # Standalone alternatives not used by the API
+├── frontend/
+│   ├── src/
+│   │   ├── api/               # Frontend API client
+│   │   ├── components/        # Form, progress, and results UI
+│   │   ├── hooks/             # Job submission and progress polling
+│   │   └── App.jsx            # Main page composition
+│   ├── package.json
+│   └── vite.config.js
+├── api.py                     # Root-level compatibility import for the API
+├── .env                       # Local secrets; do not commit
+└── README.md
 ```
 
-The pipeline writes intermediate files and its latest output under the project
-root. Generated media and frontend build/dependency directories are excluded
-from version control.
+Generated media, job snapshots, Python environments, and frontend build and
+dependency directories are runtime artifacts and should not be committed.

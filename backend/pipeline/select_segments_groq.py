@@ -3,7 +3,7 @@
 import json
 import sys
 from groq import Groq
-from utils import get_groq_api_key, load_json, resolve_project_path, save_json
+from .utils import get_groq_api_key, load_json, resolve_project_path, save_json
 
 MODEL = "openai/gpt-oss-20b"
 

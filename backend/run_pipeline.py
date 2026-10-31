@@ -6,17 +6,17 @@ import shutil
 import subprocess
 import sys
 
-from src.utils import PROJECT_ROOT, resolve_project_path
+from .pipeline.utils import PROJECT_ROOT, resolve_project_path
 
 
-SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+PIPELINE_PACKAGE = "backend.pipeline"
 
 
 def run_step(description: str, cmd: list) -> None:
     print(f"\n{'='*60}")
     print(f"STEP: {description}")
     print(f"{'='*60}")
-    result = subprocess.run(cmd, capture_output=False)
+    result = subprocess.run(cmd, capture_output=False, cwd=PROJECT_ROOT)
     if result.returncode != 0:
         print(f"\nFAILED at step: {description}")
         sys.exit(1)
@@ -72,7 +72,7 @@ def main():
 
     run_step(
         "Transcribing video (Groq whisper-large-v3-turbo)",
-        [sys.executable, "-u", os.path.join(SRC_DIR, "transcribe_groq.py"), video_name],
+        [sys.executable, "-u", "-m", f"{PIPELINE_PACKAGE}.transcribe_groq", video_name],
     )
 
     if args.rule_based:
@@ -81,24 +81,44 @@ def main():
             [
                 sys.executable,
                 "-u",
-                os.path.join(SRC_DIR, "select_segments.py"),
+                "-m",
+                f"{PIPELINE_PACKAGE}.select_segments",
                 resolve_project_path(transcript_json),
             ],
         )
     else:
         run_step(
             "Selecting segments (Groq LLM)",
-            [sys.executable, "-u", os.path.join(SRC_DIR, "select_segments_groq.py"), resolve_project_path(transcript_json)],
+            [
+                sys.executable,
+                "-u",
+                "-m",
+                f"{PIPELINE_PACKAGE}.select_segments_groq",
+                resolve_project_path(transcript_json),
+            ],
         )
 
     run_step(
         "Cutting clips",
-        [sys.executable, "-u", os.path.join(SRC_DIR, "cut_clips.py"), video_name, resolve_project_path(clips_json)],
+        [
+            sys.executable,
+            "-u",
+            "-m",
+            f"{PIPELINE_PACKAGE}.cut_clips",
+            video_name,
+            resolve_project_path(clips_json),
+        ],
     )
 
     run_step(
         "Reframing to vertical (face-tracked)",
-        [sys.executable, "-u", os.path.join(SRC_DIR, "reframe_vertical_tracked.py"), resolve_project_path("clips_output")],
+        [
+            sys.executable,
+            "-u",
+            "-m",
+            f"{PIPELINE_PACKAGE}.reframe_vertical_tracked",
+            resolve_project_path("clips_output"),
+        ],
     )
 
     final_dir = resolve_project_path("clips_output/vertical_tracked")

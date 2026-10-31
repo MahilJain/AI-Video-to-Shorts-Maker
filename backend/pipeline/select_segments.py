@@ -1,11 +1,9 @@
 """Rule-based segment selector used when the pipeline runs without Groq."""
 
 import argparse
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import load_json, resolve_project_path, save_json
+from .utils import load_json, resolve_project_path, save_json
 
 # Keep clips within the target duration range for short-form video.
 MIN_CLIP_LEN = 30

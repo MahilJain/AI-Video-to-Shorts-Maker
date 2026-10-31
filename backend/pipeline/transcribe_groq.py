@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 from groq import Groq
-from utils import get_groq_api_key, resolve_project_path, save_json
+from .utils import get_groq_api_key, resolve_project_path, save_json
 
 MODEL = "whisper-large-v3-turbo"
 MAX_GROQ_UPLOAD_BYTES = 25 * 1024 * 1024
