@@ -80,6 +80,7 @@ def prepare_upload(video_path: str) -> tuple[str, str | None]:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(errors="backslashreplace")
     args = parse_args()
     video_path = resolve_project_path(args.video_filename)
 
