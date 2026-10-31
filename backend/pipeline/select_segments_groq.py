@@ -44,7 +44,7 @@ def call_groq(prompt: str) -> str:
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=2048,
+        max_tokens=512,
         reasoning_effort="low",
     )
     return response.choices[0].message.content
