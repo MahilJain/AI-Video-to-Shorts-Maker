@@ -15,6 +15,7 @@ MAX_CHUNK_TOKENS = 2500
 TPM_BUDGET = 7500
 PROMPT_TOKEN_RESERVE = 300
 OUTPUT_TOKEN_RESERVE = 256
+RETRY_OUTPUT_TOKEN_RESERVE = 1024
 TPM_WINDOW_SECONDS = 60
 
 
@@ -123,8 +124,10 @@ class TokenBudget:
     def __init__(self) -> None:
         self.requests: deque[tuple[float, int]] = deque()
 
-    def wait_for_capacity(self, estimated_tokens: int) -> None:
-        request_tokens = estimated_tokens + PROMPT_TOKEN_RESERVE + OUTPUT_TOKEN_RESERVE
+    def wait_for_capacity(
+        self, estimated_tokens: int, output_tokens: int = OUTPUT_TOKEN_RESERVE
+    ) -> None:
+        request_tokens = estimated_tokens + PROMPT_TOKEN_RESERVE + output_tokens
         if request_tokens > TPM_BUDGET:
             raise ValueError(
                 f"Estimated request size ({request_tokens} tokens) exceeds the "
@@ -192,37 +195,56 @@ def call_groq(
     token_budget: TokenBudget,
     estimated_tokens: int,
 ) -> str:
-    for attempt in range(3):
-        token_budget.wait_for_capacity(estimated_tokens)
-        try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=OUTPUT_TOKEN_RESERVE,
-                reasoning_effort="low",
-            )
-        except Exception as error:
-            if getattr(error, "status_code", None) != 429 or attempt == 2:
-                raise
-            headers = getattr(getattr(error, "response", None), "headers", {})
-            wait_value = headers.get("retry-after") or headers.get(
-                "x-ratelimit-reset-tokens"
-            )
-            match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*s?\s*", str(wait_value or ""))
-            wait_seconds = float(match.group(1)) if match else TPM_WINDOW_SECONDS
-            print(
-                f"Groq rate limit reached; retrying in {wait_seconds:.0f}s "
-                f"(attempt {attempt + 2}/3)..."
-            )
-            time.sleep(wait_seconds)
-            continue
-        break
+    for output_tokens in (OUTPUT_TOKEN_RESERVE, RETRY_OUTPUT_TOKEN_RESERVE):
+        for attempt in range(3):
+            token_budget.wait_for_capacity(estimated_tokens, output_tokens)
+            try:
+                response = client.chat.completions.create(
+                    model=MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,
+                    max_tokens=output_tokens,
+                    reasoning_effort="low",
+                )
+            except Exception as error:
+                if getattr(error, "status_code", None) != 429 or attempt == 2:
+                    raise
+                headers = getattr(getattr(error, "response", None), "headers", {})
+                wait_value = headers.get("retry-after") or headers.get(
+                    "x-ratelimit-reset-tokens"
+                )
+                match = re.fullmatch(
+                    r"\s*(\d+(?:\.\d+)?)\s*s?\s*", str(wait_value or "")
+                )
+                wait_seconds = float(match.group(1)) if match else TPM_WINDOW_SECONDS
+                print(
+                    f"Groq rate limit reached; retrying in {wait_seconds:.0f}s "
+                    f"(attempt {attempt + 2}/3)..."
+                )
+                time.sleep(wait_seconds)
+                continue
 
-    content = response.choices[0].message.content
-    if not content:
-        raise RuntimeError("Groq returned an empty clip-selection response.")
-    return content
+            choices = response.choices
+            message = choices[0].message if choices else None
+            content = message.content if message else None
+            if isinstance(content, str) and content.strip():
+                return content
+
+            finish_reason = choices[0].finish_reason if choices else "no choices"
+            if output_tokens == OUTPUT_TOKEN_RESERVE:
+                print(
+                    "Groq returned no clip-selection text; retrying with "
+                    f"{RETRY_OUTPUT_TOKEN_RESERVE} output tokens "
+                    f"(finish reason: {finish_reason})."
+                )
+            else:
+                raise RuntimeError(
+                    "Groq returned an empty clip-selection response after "
+                    f"{output_tokens} output tokens (finish reason: {finish_reason})."
+                )
+            break
+
+    raise RuntimeError("Groq could not return a clip-selection response.")
 
 
 def main() -> None:
