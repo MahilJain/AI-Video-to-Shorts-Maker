@@ -41,9 +41,8 @@ default local setup uses the Vite `/api` proxy.
 Run commands from the `shorts-clipper` project root. On Windows PowerShell:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r backend\requirements.txt
+python -m venv venv
+.\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 Set-Location frontend
 npm install
 Set-Location ..
@@ -51,10 +50,11 @@ Set-Location ..
 
 ## Run locally
 
-Start the backend from the project root:
+Start the backend from the project root. The launcher always uses the
+project's virtual environment, even if another virtual environment is active:
 
 ```powershell
-python -m uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+.\start_backend.bat
 ```
 
 In another terminal, start the frontend:
@@ -83,13 +83,13 @@ workers or replicas are not supported.
 ## Run the pipeline from the command line
 
 ```powershell
-python -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID"
+.\venv\Scripts\python.exe -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 Pass `--rule-based` to select segments without the Groq language model:
 
 ```powershell
-python -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID" --rule-based
+.\venv\Scripts\python.exe -m backend.run_pipeline "https://www.youtube.com/watch?v=VIDEO_ID" --rule-based
 ```
 
 ## REST API
