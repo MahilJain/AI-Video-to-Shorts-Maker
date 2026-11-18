@@ -11,7 +11,8 @@ and a React/Vite web application.
   Groq language model (or use the optional rule-based selector).
 - Split long transcripts into smaller Groq requests and pace requests to stay
   under the configured token-per-minute budget.
-- Cut selected segments and reframe them to 9:16 using MediaPipe face tracking.
+- Cut selected segments and reframe them to 9:16 using smoothed face tracking and
+  mouth motion during transcript speech intervals to prefer the visible speaker.
 - Submit and monitor processing jobs through the web app or REST API.
 - Preview and download completed clips.
 
@@ -21,7 +22,7 @@ and a React/Vite web application.
 - Node.js 20 or later and npm
 - FFmpeg available on `PATH`
 - A Groq API key
-- Deno, if required by your `yt-dlp` YouTube configuration
+- Deno 2, when required by `yt-dlp` to solve YouTube's JavaScript challenges
 
 ## Configuration
 
@@ -30,6 +31,43 @@ Create a `.env` file in the project root and set your Groq API key:
 ```text
 GROQ_API_KEY=your_groq_api_key
 ```
+
+The API and command-line pipeline check for this key before starting a download,
+so a missing key does not waste time or overwrite previous outputs.
+The backend loads it into the shared `GROQ_API_KEY` setting at startup; restart
+the backend after changing `.env`.
+
+If YouTube requires sign-in to download a video, you can optionally let `yt-dlp`
+use cookies from a browser where you are signed in to YouTube:
+
+```text
+YTDLP_COOKIES_FROM_BROWSER=chrome
+```
+
+Supported browser names depend on your `yt-dlp` installation (commonly `chrome`,
+`edge`, or `firefox`). If yt-dlp cannot copy the browser's cookie database,
+export your YouTube cookies to a Netscape-format cookie file using a trusted
+local tool and configure its path instead:
+
+```text
+YTDLP_COOKIES_FILE=cookies.txt
+```
+
+The cookie-file setting takes precedence over the browser setting. Cookies are
+sensitive authentication credentials: do not upload, share, or commit the
+exported file or `.env`, and delete the export when it is no longer needed.
+YouTube may still temporarily rate-limit requests; wait and retry if the
+sign-in challenge continues.
+
+If yt-dlp cannot copy the browser cookie database, the pipeline automatically
+retries once without browser cookies. If the video requires sign-in, close the
+browser and retry, or configure `YTDLP_COOKIES_FILE` instead.
+
+The downloader retries transient network and fragment failures, and falls back
+to a combined audio/video format if separate streams are unavailable. The
+`yt-dlp[default]` dependency includes its recommended optional components for
+YouTube extraction; install it with the requirements command below after
+upgrading the project.
 
 Do not commit `.env` or real API keys. The backend loads this file from the
 project root. For a frontend hosted separately from the API, set
