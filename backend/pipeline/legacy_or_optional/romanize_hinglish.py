@@ -4,7 +4,7 @@ import os
 import sys
 from groq import Groq
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import get_groq_api_key, load_json, save_json
+from utils import GROQ_API_KEY, load_json, save_json
 
 MODEL = "openai/gpt-oss-20b"
 
@@ -45,10 +45,9 @@ def main():
     output_path = sys.argv[2] if len(sys.argv) > 2 else "transcript_hinglish.json"
 
     transcript = load_json(transcript_path)
-    api_key = get_groq_api_key()
-    if not api_key:
+    if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY not set (check your .env file).")
-    client = Groq(api_key=api_key)
+    client = Groq(api_key=GROQ_API_KEY)
 
     batch_size = 20
     print(f"Romanizing {len(transcript)} segments in batches of {batch_size}...\n")

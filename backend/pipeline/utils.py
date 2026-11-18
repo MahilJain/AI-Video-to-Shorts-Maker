@@ -24,13 +24,7 @@ def load_project_env() -> None:
     load_dotenv(ENV_PATH)
 
 
-def get_groq_api_key() -> str | None:
-    """Return the configured Groq key, including the project's legacy bare-key format."""
-    load_project_env()
-    api_key = os.environ.get("GROQ_API_KEY")
-    if api_key:
-        return api_key
-
+def _read_legacy_groq_api_key() -> str | None:
     try:
         with open(ENV_PATH, encoding="utf-8") as env_file:
             lines = [
@@ -41,6 +35,10 @@ def get_groq_api_key() -> str | None:
     except FileNotFoundError:
         return None
     return lines[0] if len(lines) == 1 and lines[0].startswith("gsk_") else None
+
+
+load_project_env()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip() or _read_legacy_groq_api_key()
 
 
 def load_json(path: str) -> Any:

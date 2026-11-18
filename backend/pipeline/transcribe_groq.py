@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 from groq import Groq
-from .utils import get_groq_api_key, resolve_project_path, save_json
+from .utils import GROQ_API_KEY, ENV_PATH, resolve_project_path, save_json
 
 MODEL = "whisper-large-v3-turbo"
 MAX_GROQ_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -87,11 +87,12 @@ def main() -> None:
     if not os.path.isfile(video_path):
         raise FileNotFoundError(video_path)
 
-    api_key = get_groq_api_key()
-    if not api_key:
-        raise RuntimeError("GROQ_API_KEY not set (check your .env file).")
+    if not GROQ_API_KEY:
+        raise RuntimeError(
+            f"GROQ_API_KEY is not set. Add it to the project .env file at {ENV_PATH}."
+        )
 
-    client = Groq(api_key=api_key)
+    client = Groq(api_key=GROQ_API_KEY)
 
     upload_path, temporary_upload = prepare_upload(video_path)
     try:

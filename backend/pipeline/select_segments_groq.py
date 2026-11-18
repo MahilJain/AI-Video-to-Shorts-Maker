@@ -8,7 +8,7 @@ from collections import deque
 
 from groq import Groq
 
-from .utils import get_groq_api_key, load_json, resolve_project_path, save_json
+from .utils import GROQ_API_KEY, load_json, resolve_project_path, save_json
 
 MODEL = "openai/gpt-oss-20b"
 MAX_CHUNK_TOKENS = 2500
@@ -17,6 +17,13 @@ PROMPT_TOKEN_RESERVE = 300
 OUTPUT_TOKEN_RESERVE = 256
 RETRY_OUTPUT_TOKEN_RESERVE = 1024
 TPM_WINDOW_SECONDS = 60
+
+
+def configure_console_output() -> None:
+    """Prevent model-generated Unicode from crashing on legacy Windows consoles."""
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="backslashreplace")
 
 
 def estimate_text_tokens(text: str) -> int:
@@ -153,17 +160,37 @@ class TokenBudget:
 
 
 def parse_clips(raw_response: str, chunk: list[dict]) -> list[dict]:
-    start_idx = raw_response.find("[")
-    end_idx = raw_response.rfind("]") + 1
-    if start_idx < 0 or end_idx <= start_idx:
-        raise RuntimeError("Groq returned a response without a JSON clip list.")
+    decoder = json.JSONDecoder()
+    clips = None
+    for index, character in enumerate(raw_response):
+        if character not in "[{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(raw_response[index:])
+        except json.JSONDecodeError:
+            continue
 
-    try:
-        clips = json.loads(raw_response[start_idx:end_idx])
-    except json.JSONDecodeError as error:
-        raise RuntimeError("Groq returned invalid JSON for the clip candidates.") from error
-    if not isinstance(clips, list):
-        raise RuntimeError("Groq returned clip candidates in an unexpected format.")
+        if isinstance(value, list):
+            clips = value
+            break
+        if isinstance(value, dict):
+            wrapped_clips = next(
+                (
+                    value[key]
+                    for key in ("clips", "candidates", "results")
+                    if isinstance(value.get(key), list)
+                ),
+                None,
+            )
+            if wrapped_clips is not None:
+                clips = wrapped_clips
+                break
+            if "start" in value and "end" in value:
+                clips = [value]
+                break
+
+    if clips is None:
+        raise RuntimeError("Groq returned a response without a JSON clip list.")
 
     chunk_start = float(chunk[0]["start"])
     chunk_end = float(chunk[-1]["end"])
@@ -194,8 +221,12 @@ def call_groq(
     prompt: str,
     token_budget: TokenBudget,
     estimated_tokens: int,
+    output_token_limits: tuple[int, ...] = (
+        OUTPUT_TOKEN_RESERVE,
+        RETRY_OUTPUT_TOKEN_RESERVE,
+    ),
 ) -> str:
-    for output_tokens in (OUTPUT_TOKEN_RESERVE, RETRY_OUTPUT_TOKEN_RESERVE):
+    for output_tokens in output_token_limits:
         for attempt in range(3):
             token_budget.wait_for_capacity(estimated_tokens, output_tokens)
             try:
@@ -228,6 +259,18 @@ def call_groq(
             message = choices[0].message if choices else None
             content = message.content if message else None
             if isinstance(content, str) and content.strip():
+                finish_reason = choices[0].finish_reason if choices else None
+                if finish_reason == "length":
+                    if output_tokens == output_token_limits[-1]:
+                        raise RuntimeError(
+                            "Groq's clip-selection response was truncated after "
+                            f"{output_tokens} output tokens."
+                        )
+                    print(
+                        "Groq's clip-selection response was truncated; retrying "
+                        f"with {RETRY_OUTPUT_TOKEN_RESERVE} output tokens."
+                    )
+                    break
                 return content
 
             finish_reason = choices[0].finish_reason if choices else "no choices"
@@ -247,7 +290,41 @@ def call_groq(
     raise RuntimeError("Groq could not return a clip-selection response.")
 
 
+def select_chunk(
+    client: Groq,
+    prompt: str,
+    token_budget: TokenBudget,
+    estimated_tokens: int,
+    chunk: list[dict],
+) -> list[dict]:
+    raw_response = call_groq(client, prompt, token_budget, estimated_tokens)
+    try:
+        return parse_clips(raw_response, chunk)
+    except RuntimeError:
+        print("Groq returned an invalid clip format; retrying with a stricter JSON prompt.")
+
+    retry_prompt = (
+        f"{prompt}\n\nYour previous response was not a valid JSON clip list. "
+        "Return only a JSON array of clip objects with numeric start and end "
+        "timestamps and a reason. Do not include markdown or commentary."
+    )
+    raw_response = call_groq(
+        client,
+        retry_prompt,
+        token_budget,
+        estimated_tokens,
+        output_token_limits=(RETRY_OUTPUT_TOKEN_RESERVE,),
+    )
+    try:
+        return parse_clips(raw_response, chunk)
+    except RuntimeError as error:
+        raise RuntimeError(
+            "Groq returned an invalid clip-selection response after one retry."
+        ) from error
+
+
 def main() -> None:
+    configure_console_output()
     transcript_path = resolve_project_path(
         sys.argv[1] if len(sys.argv) > 1 else "transcript.json"
     )
@@ -256,10 +333,10 @@ def main() -> None:
     if not chunks:
         raise RuntimeError("The transcript is empty; there is nothing to select.")
 
-    api_key = get_groq_api_key()
-    if not api_key:
+    if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY environment variable not set.")
-    client = Groq(api_key=api_key)
+
+    client = Groq(api_key=GROQ_API_KEY)
     token_budget = TokenBudget()
     clips = []
 
@@ -274,8 +351,13 @@ def main() -> None:
             f"Analyzing chunk {index}/{len(chunks)} "
             f"({estimated_tokens} estimated transcript tokens)..."
         )
-        raw_response = call_groq(client, prompt, token_budget, estimated_tokens)
-        chunk_clips = parse_clips(raw_response, chunk)
+        chunk_clips = select_chunk(
+            client,
+            prompt,
+            token_budget,
+            estimated_tokens,
+            chunk,
+        )
         if not chunk_clips:
             print(f"No valid clip candidates returned for chunk {index}.")
         clips.extend(chunk_clips)
