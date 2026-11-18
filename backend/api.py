@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
+from .pipeline.utils import GROQ_API_KEY
+
 
 BACKEND_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_ROOT.parent
@@ -256,6 +258,14 @@ def process_video(request: PipelineRequest) -> dict[str, str]:
         raise HTTPException(
             status_code=400,
             detail="Enter a valid YouTube video URL (youtube.com or youtu.be).",
+        )
+    if not GROQ_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "GROQ_API_KEY is not configured. Add it to the project root "
+                ".env file before processing a video."
+            ),
         )
 
     job_id = str(uuid.uuid4())
